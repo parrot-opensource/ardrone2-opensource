@@ -1,0 +1,4 @@
+menu "Parrot drivers"
+source "drivers/parrot/char/Kconfig"
+source "drivers/parrot/usb/otg/Kconfig"
+endmenu

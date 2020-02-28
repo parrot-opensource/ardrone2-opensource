@@ -1,0 +1,250 @@
+diff -ur udev-164.orig/libudev/libudev-device.c udev-164/libudev/libudev-device.c
+--- udev-164.orig/libudev/libudev-device.c	2010-10-22 13:56:16.000000000 +0200
++++ udev-164/libudev/libudev-device.c	2011-10-10 14:34:45.655343792 +0200
+@@ -1180,7 +1180,14 @@
+ 		goto out;
+ 
+ 	/* read attribute value */
++#ifdef O_CLOEXEC
+ 	fd = open(path, O_RDONLY|O_CLOEXEC);
++#else
++	fd = open(path, O_RDONLY);
++	if (fd >= 0) {
++		util_set_fd_cloexec(fd);
++	}
++#endif
+ 	if (fd < 0) {
+ 		dbg(udev_device->udev, "attribute '%s' can not be opened\n", path);
+ 		goto out;
+diff -ur udev-164.orig/libudev/libudev-monitor.c udev-164/libudev/libudev-monitor.c
+--- udev-164.orig/libudev/libudev-monitor.c	2010-07-19 10:56:12.000000000 +0200
++++ udev-164/libudev/libudev-monitor.c	2011-10-10 14:34:45.643344292 +0200
+@@ -55,7 +55,8 @@
+ enum udev_monitor_netlink_group {
+ 	UDEV_MONITOR_NONE,
+ 	UDEV_MONITOR_KERNEL,
+-	UDEV_MONITOR_UDEV,
++	/* avoid interfering with native udev monitors */
++	UDEV_MONITOR_UDEV = 4,
+ };
+ 
+ #define UDEV_MONITOR_MAGIC		0xfeedcafe
+diff -ur udev-164.orig/libudev/libudev-private.h udev-164/libudev/libudev-private.h
+--- udev-164.orig/libudev/libudev-private.h	2010-10-13 13:08:29.000000000 +0200
++++ udev-164/libudev/libudev-private.h	2011-10-10 14:35:16.579343765 +0200
+@@ -191,7 +191,7 @@
+ /* libudev-util.c */
+ #define UTIL_PATH_SIZE				1024
+ #define UTIL_NAME_SIZE				512
+-#define UTIL_LINE_SIZE				16384
++#define UTIL_LINE_SIZE				2048
+ #define UDEV_ALLOWED_CHARS_INPUT		"/ $%?,"
+ ssize_t util_get_sys_subsystem(struct udev *udev, const char *syspath, char *subsystem, size_t size);
+ ssize_t util_get_sys_driver(struct udev *udev, const char *syspath, char *driver, size_t size);
+diff -ur udev-164.orig/libudev/libudev-queue.c udev-164/libudev/libudev-queue.c
+--- udev-164.orig/libudev/libudev-queue.c	2010-05-31 11:16:02.000000000 +0200
++++ udev-164/libudev/libudev-queue.c	2011-10-10 14:34:45.655343792 +0200
+@@ -131,7 +131,14 @@
+ 	ssize_t len;
+ 
+ 	util_strscpyl(filename, sizeof(filename), udev_get_sys_path(udev), "/kernel/uevent_seqnum", NULL);
++#ifdef O_CLOEXEC
+ 	fd = open(filename, O_RDONLY|O_CLOEXEC);
++#else
++	fd = open(filename, O_RDONLY);
++	if (fd >= 0) {
++		util_set_fd_cloexec(fd);
++	}
++#endif
+ 	if (fd < 0)
+ 		return 0;
+ 	len = read(fd, buf, sizeof(buf));
+diff -ur udev-164.orig/libudev/libudev-util.c udev-164/libudev/libudev-util.c
+--- udev-164.orig/libudev/libudev-util.c	2010-05-28 12:07:13.000000000 +0200
++++ udev-164/libudev/libudev-util.c	2011-10-10 14:34:45.655343792 +0200
+@@ -543,12 +543,21 @@
+ /* get a bunch of bit numbers out of the hash, and set the bits in our bit field */
+ uint64_t util_string_bloom64(const char *str)
+ {
+-	uint64_t bits = 0;
++	union { uint64_t v; uint32_t hl[2]; } bits = { 0 };
+ 	unsigned int hash = util_string_hash32(str);
++	int i = 0;
+ 
+-	bits |= 1LLU << (hash & 63);
+-	bits |= 1LLU << ((hash >> 6) & 63);
+-	bits |= 1LLU << ((hash >> 12) & 63);
+-	bits |= 1LLU << ((hash >> 18) & 63);
+-	return bits;
++	while(i < 4) {
++		unsigned int pos = ((hash >> (i*6)) & 63);
++		
++		if( pos < 32) {
++			bits.hl[0] |= 1LU << pos;
++		} else {
++			bits.hl[1] |= 1LU << (pos - 32);
++		}
++		i++;
++	}
++	
++	return bits.v;
+ }
++
+diff -ur udev-164.orig/libudev/libudev.c udev-164/libudev/libudev.c
+--- udev-164.orig/libudev/libudev.c	2010-05-14 14:43:54.000000000 +0200
++++ udev-164/libudev/libudev.c	2011-10-10 14:34:45.643344292 +0200
+@@ -121,7 +121,7 @@
+ 	udev->log_fn = log_stderr;
+ 	udev->log_priority = LOG_ERR;
+ 	udev_list_init(&udev->properties_list);
+-	udev->dev_path = strdup("/dev");
++	udev->dev_path = strdup("/tmp/udev/dev");
+ 	udev->sys_path = strdup("/sys");
+ 	config_file = strdup(SYSCONFDIR "/udev/udev.conf");
+ 	if (udev->dev_path == NULL ||
+diff -ur udev-164.orig/libudev/libudev.h udev-164/libudev/libudev.h
+--- udev-164.orig/libudev/libudev.h	2010-04-23 16:02:13.000000000 +0200
++++ udev-164/libudev/libudev.h	2011-10-10 14:34:45.655343792 +0200
+@@ -20,6 +20,15 @@
+ extern "C" {
+ #endif
+ 
++#define UDEV_MAJOR 1
++#define UDEV_MINOR 6
++#define UDEV_REV   4
++
++#define UDEV_API_CHECK_VERSION(major, minor, rev) \
++    ( (UDEV_MAJOR > (major) )|| \
++      (UDEV_MAJOR == (major) && UDEV_MINOR > (minor)) || \
++      (UDEV_MAJOR == (major) && UDEV_MINOR == (minor) && UDEV_REV >= (rev)))
++
+ /*
+  * udev - library context
+  * 
+diff -ur udev-164.orig/udev/udev.h udev-164/udev/udev.h
+--- udev-164.orig/udev/udev.h	2010-07-07 11:26:55.000000000 +0200
++++ udev-164/udev/udev.h	2011-10-10 14:34:45.647344114 +0200
+@@ -29,7 +29,7 @@
+ #define DEFAULT_FAKE_PARTITIONS_COUNT		15
+ #define UDEV_EVENT_TIMEOUT			180
+ 
+-#define UDEV_CTRL_SOCK_PATH			"@/org/kernel/udev/udevd"
++#define UDEV_CTRL_SOCK_PATH			"@/org/kernel/udev/udevd-ujuba"
+ 
+ struct udev_event {
+ 	struct udev *udev;
+diff -ur udev-164.orig/udev/udevd.c udev-164/udev/udevd.c
+--- udev-164.orig/udev/udevd.c	2010-10-13 13:08:29.000000000 +0200
++++ udev-164/udev/udevd.c	2011-10-10 14:34:45.647344114 +0200
+@@ -44,6 +44,10 @@
+ #include <sys/inotify.h>
+ #include <sys/utsname.h>
+ 
++#ifdef ANDROID
++#include <cutils/logd.h>
++#endif
++
+ #include "udev.h"
+ #include "sd-daemon.h"
+ 
+@@ -56,6 +60,28 @@
+ 		   const char *file, int line, const char *fn,
+ 		   const char *format, va_list args)
+ {
++#ifdef ANDROID
++	int level = ANDROID_LOG_INFO;
++	switch(priority) {
++		case LOG_INFO :
++			level = ANDROID_LOG_INFO;
++			break;
++
++		case LOG_DEBUG :
++			level = ANDROID_LOG_DEBUG;
++			break;
++		
++		case LOG_WARNING :
++			level = ANDROID_LOG_WARN;
++			break;
++
++		case LOG_ERR :
++			level = ANDROID_LOG_ERROR;
++			break;
++	}
++#endif
++	
++
+ 	if (debug) {
+ 		char buf[1024];
+ 		struct timeval tv;
+@@ -63,12 +89,25 @@
+ 
+ 		vsnprintf(buf, sizeof(buf), format, args);
+ 		gettimeofday(&tv, &tz);
++
++#ifdef ANDROID
++		__android_log_print(level, "udevd", "%llu.%06u [%u] %s: %s",
++			(unsigned long long) tv.tv_sec, (unsigned int) tv.tv_usec,
++			(int) getpid(), fn, buf);
++#else
+ 		fprintf(stderr, "%llu.%06u [%u] %s: %s",
+ 			(unsigned long long) tv.tv_sec, (unsigned int) tv.tv_usec,
+ 			(int) getpid(), fn, buf);
++#endif
+ 	} else {
++
++#ifdef ANDROID
++		__android_log_vprint(level, "udevd", format, args);
++#else
+ 		vsyslog(priority, format, args);
++#endif
+ 	}
++
+ }
+ 
+ static struct udev_rules *rules;
+@@ -272,8 +311,11 @@
+ 		sigdelset(&sigmask, SIGTERM);
+ 
+ 		/* request TERM signal if parent exits */
++#ifndef ANDROID
+ 		prctl(PR_SET_PDEATHSIG, SIGTERM);
+-
++#else
++		prctl(PR_SET_PDEATHSIG, SIGTERM, 0,0,0);
++#endif
+ 		/* initial device */
+ 		dev = event->dev;
+ 
+@@ -883,11 +925,20 @@
+ 			mkdirat(dirfd(dir_to), dent->d_name, 0755);
+ 			udev_selinux_resetfscreatecon(udev);
+ 
++#ifdef O_CLOEXEC
+ 			dir2_to = fdopendir(openat(dirfd(dir_to), dent->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC));
++#else
++			dir2_to = fdopendir(openat(dirfd(dir_to), dent->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY));
++#endif
++
+ 			if (dir2_to == NULL)
+ 				continue;
+ 
++#ifdef O_CLOEXEC
+ 			dir2_from = fdopendir(openat(dirfd(dir_from), dent->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC));
++#else
++			dir2_to = fdopendir(openat(dirfd(dir_to), dent->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY));
++#endif
+ 			if (dir2_from == NULL) {
+ 				closedir(dir2_to);
+ 				continue;
+@@ -1229,9 +1280,9 @@
+ 			rc = 0;
+ 			goto exit;
+ 		}
+-	} else {
++	}/* else {
+ 		sd_notify(1, "READY=1");
+-	}
++	}*/
+ 
+ 	/* set scheduling priority for the main daemon process */
+ 	setpriority(PRIO_PROCESS, 0, UDEVD_PRIORITY);

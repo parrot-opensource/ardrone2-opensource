@@ -1,0 +1,63 @@
+#############################################################
+#
+# util-linux-ng
+#
+#############################################################
+
+BLKIDBIN:=blkid-ng
+
+# Force inclusion of stdlib.h for rand/srand declarations
+override CFLAGS:=-include $(RAPTOR_DIR)/bionic/libc/include/stdlib.h \
+    -include $(BUILD_DIR)/config.h \
+    -I$(BUILD_DIR)/shlibs/blkid/src \
+    -I$(BUILD_DIR)/include \
+    -I$(BUILD_DIR)/shlibs/uuid/src/ \
+    $(CFLAGS) -Wno-sign-compare -Wno-missing-field-initializers
+
+$(BUILD_DIR)/shlibs/uuid/src/libuuid.a: $(addprefix $(BUILD_DIR)/shlibs/uuid/src/, clear.o compare.o copy.o gen_uuid.o isnull.o pack.o parse.o unpack.o unparse.o uuid_time.o)
+	$(AR) rcs $@ $^
+
+$(BUILD_DIR)/shlibs/blkid/src/superblocks/libblkid_superblocks.a: $(addprefix $(BUILD_DIR)/shlibs/blkid/src/superblocks/, superblocks.o cramfs.o swap.o \
+	adaptec_raid.o ddf_raid.o isw_raid.o jmicron_raid.o lsi_raid.o nvidia_raid.o promise_raid.o silicon_raid.o \
+	via_raid.o linux_raid.o jfs.o xfs.o ext.o gfs.o ocfs.o \
+	reiserfs.o romfs.o ntfs.o hfs.o iso9660.o udf.o vfat.o luks.o highpoint_raid.o vxfs.o minix.o ufs.o hpfs.o \
+	squashfs.o netware.o sysv.o btrfs.o lvm.o zfs.o ubifs.o bfs.o drbd.o vmfs.o)
+	$(AR) rcs $@ $^
+
+$(BUILD_DIR)/shlibs/blkid/src/topology/libblkid_topology.a: $(addprefix $(BUILD_DIR)/shlibs/blkid/src/topology/, topology.o ioctl.o sysfs.o md.o dm.o evms.o lvm.o)
+	$(AR) rcs $@ $^
+
+$(BUILD_DIR)/shlibs/blkid/src/partitions/libblkid_partitions.a: $(addprefix $(BUILD_DIR)/shlibs/blkid/src/partitions/, partitions.o aix.o bsd.o unixware.o solaris_x86.o \
+    sun.o sgi.o mac.o dos.o minix.o gpt.o)
+	$(AR) rcs $@ $^
+
+$(BUILD_DIR)/shlibs/blkid/src/libblkid.a: $(addprefix $(BUILD_DIR)/shlibs/blkid/src/, cache.o dev.o devname.o devno.o getsize.o llseek.o \
+    probe.o read.o resolve.o save.o tag.o version.o verify.o encode.o config.o evaluate.o) \
+    $(addprefix $(BUILD_DIR)/lib/, blkdev.o linux_version.o canonicalize.o md5.o crc32.o)
+	$(AR) rcs $@ $^
+
+blkid_OBJS:=$(BUILD_DIR)/misc-utils/blkid.o
+
+$(BUILD_DIR)/$(BLKIDBIN): $(blkid_OBJS) $(BUILD_DIR)/shlibs/blkid/src/libblkid.a $(BUILD_DIR)/shlibs/blkid/src/superblocks/libblkid_superblocks.a \
+    $(BUILD_DIR)/shlibs/blkid/src/topology/libblkid_topology.a $(BUILD_DIR)/shlibs/blkid/src/partitions/libblkid_partitions.a \
+    $(BUILD_DIR)/shlibs/uuid/src/libuuid.a
+	$(CC) -o $@ $(blkid_OBJS) $(LDFLAGS) \
+        -L$(BUILD_DIR)/shlibs/blkid/src/superblocks -lblkid_superblocks -L$(BUILD_DIR)/shlibs/blkid/src/partitions -lblkid_partitions \
+        -L$(BUILD_DIR)/shlibs/blkid/src -lblkid -L$(BUILD_DIR)/shlibs/blkid/src/topology -lblkid_topology -L$(BUILD_DIR)/shlibs/uuid/src -luuid 
+
+build: $(BUILD_DIR)/$(BLKIDBIN)
+
+install:
+	install -m755 $(BUILD_DIR)/$(BLKIDBIN) $(TARGET_DIR)/sbin/$(BLKIDBIN)
+	$(STRIP) $(TARGET_DIR)/sbin/$(BLKIDBIN)
+
+clean:
+	find $(BUILD_DIR) -name "*.[ao]" -delete
+	rm -f $(BUILD_DIR)/$(BLKIDBIN)
+
+dirclean:
+	rm -f $(INSTALL_DIR)/lib/libuuid.a
+	rm -f $(INSTALL_DIR)/lib/libblkid.a
+	rm -rf $(INSTALL_DIR)/include/uuid
+	rm -rf $(INSTALL_DIR)/include/blkid
+	rm -f $(TARGET_DIR)/sbin/$(BLKIDBIN)

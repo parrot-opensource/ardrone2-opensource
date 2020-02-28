@@ -1,0 +1,111 @@
+diff -u udev-164-org//Makefile.am udev-164/Makefile.am
+--- udev-164-org//Makefile.am	2010-10-22 13:56:16.000000000 +0200
++++ udev-164/Makefile.am	2012-04-30 17:39:05.000000000 +0200
+@@ -139,7 +139,8 @@
+ 
+ sbin_PROGRAMS = \
+ 	udev/udevd \
+-	udev/udevadm
++	udev/udevadm \
++	udev/udevd_init
+ 
+ udev_common_sources =\
+ 	udev/udev.h \
+@@ -166,6 +167,13 @@
+ 	udev/udevadm-trigger.c
+ udev_udevadm_LDADD = libudev/libudev-private.la
+ 
++udev_udevd_init_SOURCES =  \
++	$(udev_common_sources) \
++	udev/udevadm-settle.c \
++	udev/udevadm-trigger.c \
++	udev/udevd_init.c
++udev_udevd_init_LDADD = libudev/libudev-private.la
++
+ # ------------------------------------------------------------------------------
+ # udev man pages
+ # ------------------------------------------------------------------------------
+diff -u udev-164-org//Makefile.in udev-164/Makefile.in
+--- udev-164-org//Makefile.in	2010-10-23 15:14:21.000000000 +0200
++++ udev-164/Makefile.in	2012-04-30 18:24:12.000000000 +0200
+@@ -45,7 +45,7 @@
+ host_triplet = @host@
+ @WITH_SELINUX_TRUE@am__append_1 = libudev/libudev-selinux-private.c
+ @WITH_SYSTEMD_TRUE@am__append_2 = systemd-install-hook
+-sbin_PROGRAMS = udev/udevd$(EXEEXT) udev/udevadm$(EXEEXT)
++sbin_PROGRAMS = udev/udevd$(EXEEXT) udev/udevadm$(EXEEXT) udev/udevd_init$(EXEEXT)
+ check_PROGRAMS = libudev/test-libudev$(EXEEXT) udev/test-udev$(EXEEXT)
+ libexec_PROGRAMS = extras/firmware/firmware$(EXEEXT) \
+ 	extras/ata_id/ata_id$(EXEEXT) \
+@@ -343,6 +343,10 @@
+ 	udev/udevadm-settle.$(OBJEXT) udev/udevadm-trigger.$(OBJEXT)
+ udev_udevadm_OBJECTS = $(am_udev_udevadm_OBJECTS)
+ udev_udevadm_DEPENDENCIES = libudev/libudev-private.la
++am_udev_udevd_init_OBJECTS = $(am__objects_3) udev/udevd_init.$(OBJEXT) \
++	udev/udevadm-trigger.$(OBJEXT) udev/udevadm-settle.$(OBJEXT)
++udev_udevd_init_OBJECTS = $(am_udev_udevd_init_OBJECTS)
++udev_udevd_init_DEPENDENCIES = libudev/libudev-private.la
+ am_udev_udevd_OBJECTS = $(am__objects_3) udev/udevd.$(OBJEXT) \
+ 	udev/sd-daemon.$(OBJEXT)
+ udev_udevd_OBJECTS = $(am_udev_udevd_OBJECTS)
+@@ -402,7 +406,7 @@
+ 	$(extras_usb_id_usb_id_SOURCES) \
+ 	$(extras_v4l_id_v4l_id_SOURCES) \
+ 	$(libudev_test_libudev_SOURCES) $(udev_test_udev_SOURCES) \
+-	$(udev_udevadm_SOURCES) $(udev_udevd_SOURCES)
++	$(udev_udevadm_SOURCES) $(udev_udevd_init_SOURCES) $(udev_udevd_SOURCES)
+ DIST_SOURCES = $(am__extras_gudev_libgudev_1_0_la_SOURCES_DIST) \
+ 	$(am__dist_extras_gudev_libgudev_1_0_la_SOURCES_DIST) \
+ 	$(am__libudev_libudev_private_la_SOURCES_DIST) \
+@@ -426,7 +430,7 @@
+ 	$(extras_usb_id_usb_id_SOURCES) \
+ 	$(extras_v4l_id_v4l_id_SOURCES) \
+ 	$(libudev_test_libudev_SOURCES) $(udev_test_udev_SOURCES) \
+-	$(udev_udevadm_SOURCES) $(udev_udevd_SOURCES)
++	$(udev_udevadm_SOURCES) $(udev_udevd_init_SOURCES) $(udev_udevd_SOURCES)
+ RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
+ 	html-recursive info-recursive install-data-recursive \
+ 	install-dvi-recursive install-exec-recursive \
+@@ -823,6 +827,13 @@
+ 
+ udev_udevadm_LDADD = libudev/libudev-private.la
+ 
++udev_udevd_init_SOURCES =  \
++	$(udev_common_sources) \
++	udev/udevadm-settle.c \
++	udev/udevadm-trigger.c \
++	udev/udevd_init.c
++udev_udevd_init_LDADD = libudev/libudev-private.la
++
+ # ------------------------------------------------------------------------------
+ # udev man pages
+ # ------------------------------------------------------------------------------
+@@ -1633,6 +1644,11 @@
+ 	$(AM_V_CCLD)$(LINK) $(udev_udevadm_OBJECTS) $(udev_udevadm_LDADD) $(LIBS)
+ udev/udevd.$(OBJEXT): udev/$(am__dirstamp) \
+ 	udev/$(DEPDIR)/$(am__dirstamp)
++udev/udevd_init.$(OBJEXT): udev/$(am__dirstamp) \
++	udev/$(DEPDIR)/$(am__dirstamp)
++udev/udevd_init$(EXEEXT): $(udev_udevd_init_OBJECTS) $(udev_udevd_init_DEPENDENCIES) udev/$(am__dirstamp)
++	@rm -f udev/udevd_init$(EXEEXT)
++	$(AM_V_CCLD)$(LINK) $(udev_udevd_init_OBJECTS) $(udev_udevd_init_LDADD) $(LIBS)
+ udev/sd-daemon.$(OBJEXT): udev/$(am__dirstamp) \
+ 	udev/$(DEPDIR)/$(am__dirstamp)
+ udev/udevd$(EXEEXT): $(udev_udevd_OBJECTS) $(udev_udevd_DEPENDENCIES) udev/$(am__dirstamp)
+@@ -1745,6 +1761,7 @@
+ 	-rm -f udev/udevadm-trigger.$(OBJEXT)
+ 	-rm -f udev/udevadm.$(OBJEXT)
+ 	-rm -f udev/udevd.$(OBJEXT)
++	-rm -f udev/udevd_init.$(OBJEXT)
+ 
+ distclean-compile:
+ 	-rm -f *.tab.c
+@@ -1803,6 +1820,7 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@udev/$(DEPDIR)/udevadm-trigger.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@udev/$(DEPDIR)/udevadm.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@udev/$(DEPDIR)/udevd.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@udev/$(DEPDIR)/udevd_init.Po@am__quote@
+ 
+ .c.o:
+ @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+

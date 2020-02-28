@@ -1,0 +1,109 @@
+diff -ur udev-164.orig/extras/v4l_id/v4l_id.c udev-164/extras/v4l_id/v4l_id.c
+--- udev-164.orig/extras/v4l_id/v4l_id.c	2009-12-03 13:45:03.000000000 +0100
++++ udev-164/extras/v4l_id/v4l_id.c	2011-10-10 14:37:13.135342555 +0200
+@@ -28,7 +28,6 @@
+ #include <sys/types.h>
+ #include <sys/time.h>
+ #include <sys/ioctl.h>
+-#include <linux/videodev.h>
+ #include <linux/videodev2.h>
+ 
+ int main (int argc, char *argv[])
+@@ -39,7 +38,6 @@
+ 	};
+ 	int fd;
+ 	char *device;
+-	struct video_capability v1cap;
+ 	struct v4l2_capability v2cap;
+ 
+ 	while (1) {
+@@ -82,21 +80,7 @@
+ 		if ((v2cap.capabilities & V4L2_CAP_RADIO) > 0)
+ 			printf("radio:");
+ 		printf("\n");
+-	} else if (ioctl (fd, VIDIOCGCAP, &v1cap) == 0) {
+-		printf("ID_V4L_VERSION=1\n");
+-		printf("ID_V4L_PRODUCT=%s\n", v1cap.name);
+-		printf("ID_V4L_CAPABILITIES=:");
+-		if ((v1cap.type & VID_TYPE_CAPTURE) > 0)
+-			printf("capture:");
+-		if ((v1cap.type & VID_TYPE_OVERLAY) > 0)
+-			printf("video_overlay:");
+-		if (v1cap.audios > 0)
+-			printf("audio:");
+-		if ((v1cap.type & VID_TYPE_TUNER) > 0)
+-			printf("tuner:");
+-		printf("\n");
+ 	}
+-
+ 	close (fd);
+ 	return 0;
+ }
+diff -ur udev-164.orig/libudev/libudev-monitor.c udev-164/libudev/libudev-monitor.c
+--- udev-164.orig/libudev/libudev-monitor.c	2010-07-19 10:56:12.000000000 +0200
++++ udev-164/libudev/libudev-monitor.c	2011-10-10 14:37:13.135342555 +0200
+@@ -55,7 +55,8 @@
+ enum udev_monitor_netlink_group {
+ 	UDEV_MONITOR_NONE,
+ 	UDEV_MONITOR_KERNEL,
+-	UDEV_MONITOR_UDEV,
++	/* avoid interfering with native udev monitors */
++	UDEV_MONITOR_UDEV = 4,
+ };
+ 
+ #define UDEV_MONITOR_MAGIC		0xfeedcafe
+diff -ur udev-164.orig/libudev/libudev-private.h udev-164/libudev/libudev-private.h
+--- udev-164.orig/libudev/libudev-private.h	2010-10-13 13:08:29.000000000 +0200
++++ udev-164/libudev/libudev-private.h	2011-10-10 14:37:26.399342567 +0200
+@@ -191,7 +191,7 @@
+ /* libudev-util.c */
+ #define UTIL_PATH_SIZE				1024
+ #define UTIL_NAME_SIZE				512
+-#define UTIL_LINE_SIZE				16384
++#define UTIL_LINE_SIZE				2048
+ #define UDEV_ALLOWED_CHARS_INPUT		"/ $%?,"
+ ssize_t util_get_sys_subsystem(struct udev *udev, const char *syspath, char *subsystem, size_t size);
+ ssize_t util_get_sys_driver(struct udev *udev, const char *syspath, char *driver, size_t size);
+diff -ur udev-164.orig/libudev/libudev.c udev-164/libudev/libudev.c
+--- udev-164.orig/libudev/libudev.c	2010-05-14 14:43:54.000000000 +0200
++++ udev-164/libudev/libudev.c	2011-10-10 14:37:13.139342680 +0200
+@@ -121,7 +121,7 @@
+ 	udev->log_fn = log_stderr;
+ 	udev->log_priority = LOG_ERR;
+ 	udev_list_init(&udev->properties_list);
+-	udev->dev_path = strdup("/dev");
++	udev->dev_path = strdup("/tmp/udev/dev");
+ 	udev->sys_path = strdup("/sys");
+ 	config_file = strdup(SYSCONFDIR "/udev/udev.conf");
+ 	if (udev->dev_path == NULL ||
+diff -ur udev-164.orig/libudev/libudev.h udev-164/libudev/libudev.h
+--- udev-164.orig/libudev/libudev.h	2010-04-23 16:02:13.000000000 +0200
++++ udev-164/libudev/libudev.h	2011-10-10 14:37:13.139342680 +0200
+@@ -20,6 +20,15 @@
+ extern "C" {
+ #endif
+ 
++#define UDEV_MAJOR 1
++#define UDEV_MINOR 6
++#define UDEV_REV   4
++
++#define UDEV_API_CHECK_VERSION(major, minor, rev) \
++    ( (UDEV_MAJOR > (major) )|| \
++      (UDEV_MAJOR == (major) && UDEV_MINOR > (minor)) || \
++      (UDEV_MAJOR == (major) && UDEV_MINOR == (minor) && UDEV_REV >= (rev)))
++
+ /*
+  * udev - library context
+  * 
+diff -ur udev-164.orig/udev/udev.h udev-164/udev/udev.h
+--- udev-164.orig/udev/udev.h	2010-07-07 11:26:55.000000000 +0200
++++ udev-164/udev/udev.h	2011-10-10 14:37:13.139342680 +0200
+@@ -29,7 +29,7 @@
+ #define DEFAULT_FAKE_PARTITIONS_COUNT		15
+ #define UDEV_EVENT_TIMEOUT			180
+ 
+-#define UDEV_CTRL_SOCK_PATH			"@/org/kernel/udev/udevd"
++#define UDEV_CTRL_SOCK_PATH			"@/org/kernel/udev/udevd-ujuba"
+ 
+ struct udev_event {
+ 	struct udev *udev;

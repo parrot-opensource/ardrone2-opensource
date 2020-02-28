@@ -1,0 +1,108 @@
+diff -rau ltt-control-0.87-09062010/lttctl/ltt-armall.sh /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl/ltt-armall.sh
+--- ltt-control-0.87-09062010/lttctl/ltt-armall.sh	2011-01-12 16:59:54.000000000 +0100
++++ /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl/ltt-armall.sh	2011-01-12 17:47:12.000000000 +0100
+@@ -42,36 +42,36 @@
+ 	exit 1;
+ fi
+ 
+-while getopts "lnqh" options; do
+-	case ${options} in
+-		l) LOCKING="0";;
+-		n) NETWORK="0";;
+-		q) QUIET="0";;
+-		i) INPUT="0";;
+-		h) usage;
+-			exit 0;;
+-		\?) usage;
+-			exit 1;;
+-	esac
+-done
+-shift $((${OPTIND} - 1))
++#while getopts "lnqh" options; do
++#	case ${options} in
++#		l) LOCKING="0";;
++#		n) NETWORK="0";;
++#		q) QUIET="0";;
++#		i) INPUT="0";;
++#		h) usage;
++#			exit 0;;
++#		\?) usage;
++#			exit 1;;
++#	esac
++#done
++#shift $((${OPTIND} - 1))
+ 
+ 
+-if [ ! ${LOCKING} ]; then
++#if [ ! ${LOCKING} ]; then
+ 	TESTS="${TESTS} -name lockdep -prune -o -name locking -prune -o"
+-fi
++#fi
+ 
+-if [ ! ${NETWORK} ]; then
++#if [ ! ${NETWORK} ]; then
+ 	TESTS="${TESTS} -path '*/net/*_extended' -prune -o"
+-fi
++#fi
+ 
+-if [ ! ${INPUT} ]; then
++#if [ ! ${INPUT} ]; then
+ 	TESTS="${TESTS} -name input -prune -o"
+-fi
++#fi
+ 
+ (eval "find '${MARKERSROOT}' ${TESTS} -name metadata -prune -o -name enable -print") | while read -r marker; do
+-	if [ ! ${QUIET} ]; then
++#	if [ ! ${QUIET} ]; then
+ 		echo "Connecting ${marker%/enable}"
+-	fi
++#	fi
+ 	echo 1 > ${marker}
+ done
+Seulement dans /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl: ltt-armall.sh~
+Seulement dans /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl: .ltt-armall.sh.swn
+Seulement dans /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl: .ltt-armall.sh.swo
+Seulement dans /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl: .ltt-armall.sh.swp
+diff -rau ltt-control-0.87-09062010/lttctl/ltt-disarmall.sh /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl/ltt-disarmall.sh
+--- ltt-control-0.87-09062010/lttctl/ltt-disarmall.sh	2011-01-12 16:59:54.000000000 +0100
++++ /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl/ltt-disarmall.sh	2011-01-12 17:47:36.000000000 +0100
+@@ -38,24 +38,24 @@
+ 	exit 1;
+ fi
+ 
+-while getopts "qh" options; do
+-	case ${options} in
+-		q) QUIET="0";;
+-		h) usage;
+-			exit 0;;
+-		\?) usage;
+-			exit 1;;
+-	esac
+-done
+-shift $((${OPTIND} - 1))
++#while getopts "qh" options; do
++#	case ${options} in
++#		q) QUIET="0";;
++#		h) usage;
++#			exit 0;;
++#		\?) usage;
++#			exit 1;;
++#	esac
++#done
++#shift $((${OPTIND} - 1))
+ 
+ (eval "find '${MARKERSROOT}' -name metadata -prune -o -name enable -print") | while read -r marker; do
+ 	grep "^1$" "${marker}" -q
+ 	if [ $? -ne 0 ]; then
+ 		continue
+ 	fi
+-	if [ ! ${QUIET} ]; then
++#	if [ ! ${QUIET} ]; then
+ 		echo "Disconnecting ${marker%/enable}"
+-	fi
++#	fi
+ 	echo 0 > ${marker}
+ done
+Seulement dans /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl: ltt-disarmall.sh~
+Seulement dans /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl: .ltt-disarmall.sh.swo
+Seulement dans /home/julien/devOS2/Linux/packages/utils/ltt/ltt-control-0.87-09062010/lttctl: .ltt-disarmall.sh.swp

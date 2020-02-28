@@ -1,0 +1,72 @@
+diff -ru udev-164.orig/libudev/libudev-ctrl.c udev-164/libudev/libudev-ctrl.c
+--- udev-164.orig/libudev/libudev-ctrl.c	2012-10-01 16:42:44.000000000 +0200
++++ udev-164/libudev/libudev-ctrl.c	2012-10-01 16:43:48.000000000 +0200
+@@ -232,11 +232,6 @@
+ 		goto err;
+ 	}
+ 
+-	if (cred->uid != 0) {
+-		err(uctrl->udev, "sender uid=%i, message ignored\n", cred->uid);
+-		goto err;
+-	}
+-
+ 	uctrl_msg->pid = cred->pid;
+ 
+ 	if (uctrl_msg->ctrl_msg_wire.magic != UDEV_CTRL_MAGIC) {
+diff -ru udev-164.orig/libudev/libudev-monitor.c udev-164/libudev/libudev-monitor.c
+--- udev-164.orig/libudev/libudev-monitor.c	2012-10-01 16:42:44.000000000 +0200
++++ udev-164/libudev/libudev-monitor.c	2012-10-01 16:43:48.000000000 +0200
+@@ -618,10 +618,6 @@
+ 	}
+ 
+ 	cred = (struct ucred *)CMSG_DATA(cmsg);
+-	if (cred->uid != 0) {
+-		info(udev_monitor->udev, "sender uid=%d, message ignored\n", cred->uid);
+-		return NULL;
+-	}
+ 
+ 	if (memcmp(buf, "libudev", 8) == 0) {
+ 		/* udev message needs proper version magic */
+diff -ru udev-164.orig/udev/udevadm-control.c udev-164/udev/udevadm-control.c
+--- udev-164.orig/udev/udevadm-control.c	2012-10-01 16:42:44.000000000 +0200
++++ udev-164/udev/udevadm-control.c	2012-10-01 16:43:48.000000000 +0200
+@@ -57,11 +57,6 @@
+ 		{}
+ 	};
+ 
+-	if (getuid() != 0) {
+-		fprintf(stderr, "root privileges required\n");
+-		return 1;
+-	}
+-
+ 	uctrl = udev_ctrl_new_from_socket(udev, UDEV_CTRL_SOCK_PATH);
+ 	if (uctrl == NULL)
+ 		return 2;
+diff -ru udev-164.orig/udev/udevadm-settle.c udev-164/udev/udevadm-settle.c
+--- udev-164.orig/udev/udevadm-settle.c	2012-10-01 16:42:44.000000000 +0200
++++ udev-164/udev/udevadm-settle.c	2012-10-01 16:43:48.000000000 +0200
+@@ -163,7 +163,7 @@
+ 	}
+ 
+ 	/* guarantee that the udev daemon isn't pre-processing */
+-	if (getuid() == 0) {
++	if (1) {
+ 		struct udev_ctrl *uctrl;
+ 
+ 		uctrl = udev_ctrl_new_from_socket(udev, UDEV_CTRL_SOCK_PATH);
+diff -ru udev-164.orig/udev/udevd.c udev-164/udev/udevd.c
+--- udev-164.orig/udev/udevd.c	2012-10-01 16:42:44.000000000 +0200
++++ udev-164/udev/udevd.c	2012-10-01 16:43:48.000000000 +0200
+@@ -1146,12 +1146,6 @@
+ 		fclose(f);
+ 	}
+ 
+-	if (getuid() != 0) {
+-		fprintf(stderr, "root privileges required\n");
+-		err(udev, "root privileges required\n");
+-		goto exit;
+-	}
+-
+ 	/* set umask before creating any file/directory */
+ 	chdir("/");
+ 	umask(022);

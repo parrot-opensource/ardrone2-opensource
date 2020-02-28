@@ -1,0 +1,15 @@
+--- libusb-0.1.12/linux.c	2012-10-18 13:54:06.731446797 +0200
++++ libusb-0.1.12/linux.c.new	2012-10-18 13:54:59.287445744 +0200
+@@ -220,6 +220,12 @@
+     waiting = 1;
+     context = NULL;
+     while (!urb.usercontext && ((ret = ioctl(dev->fd, IOCTL_USB_REAPURBNDELAY, &context)) == -1) && waiting) {
++
++      /* early abort if there is no device */
++      if (ret == -1 && errno == ENODEV) {
++        break;
++      }
++
+       tv.tv_sec = 0;
+       tv.tv_usec = 1000; // 1 msec
+       select(dev->fd + 1, NULL, &writefds, NULL, &tv); //sub second wait

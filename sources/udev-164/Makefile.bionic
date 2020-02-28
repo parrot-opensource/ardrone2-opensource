@@ -1,0 +1,102 @@
+# Makefile for udev port to bionic -*- mode: makefile -*-
+
+CFLAGS += -Wno-extra -include "config.h" \
+		-DSYSCONFDIR=\"/system/lib\" \
+		-DLIBEXECDIR=\"/system/lib/udev\" \
+		-DVERSION=\"164\" \
+		-I ./libudev -I ./inc
+
+libudev_HEADERS = libudev/libudev.h	libudev/libudev-private.h udev/udev.h
+
+libudev_SOURCES =\
+	libudev/libudev.c \
+	libudev/libudev-list.c \
+	libudev/libudev-util.c \
+	libudev/libudev-device.c \
+	libudev/libudev-enumerate.c \
+	libudev/libudev-monitor.c \
+	libudev/libudev-queue.c
+
+libudev_private_SOURCES =\
+	$(libudev_SOURCES) \
+	libudev/libudev-ctrl.c \
+	libudev/libudev-util-private.c \
+	libudev/libudev-device-private.c \
+	libudev/libudev-queue-private.c
+
+udev_common_sources =\
+	udev/udev-event.c \
+	udev/udev-watch.c \
+	udev/udev-node.c \
+	udev/udev-rules.c
+
+udev_udevd_SOURCES = \
+	$(udev_common_sources) \
+	udev/udevd.c
+
+udev_udevadm_SOURCES = \
+	$(udev_common_sources) \
+	udev/udevadm.c \
+	udev/udevadm-info.c \
+	udev/udevadm-control.c \
+	udev/udevadm-test.c \
+	udev/udevadm-monitor.c \
+	udev/udevadm-settle.c \
+	udev/udevadm-trigger.c
+
+udev_udevd_init_SOURCES = \
+	$(udev_common_sources) \
+	udev/udevadm-settle.c \
+	udev/udevadm-trigger.c \
+	udev/udevd_init.c
+
+usb_id_SOURCES	= extras/usb_id/usb_id.c
+
+libudev_OBJS 		= $(patsubst %.c,%.o,$(libudev_SOURCES))
+libudev_private_OBJS= $(patsubst %.c,%.o,$(libudev_private_SOURCES))
+udevd_OBJS 			= $(patsubst %.c,%.o,$(udev_udevd_SOURCES))
+udevadm_OBJS		= $(patsubst %.c,%.o,$(udev_udevadm_SOURCES))
+udevd_init_OBJS		= $(patsubst %.c,%.o,$(udev_udevd_init_SOURCES))
+usb_id_OBJS 		= $(patsubst %.c,%.o,$(usb_id_SOURCES))
+
+LIBS = -L. -ludev-private
+
+all: libudev.so libudev.a udev/udevd udev/udevadm udev/udevd_init extras/usb_id/usb_id
+
+%.o: %.c $(libudev_HEADERS)
+	@echo "  CC\t$$(basename $@)" 
+	$(CC) -c -o $@ $(CFLAGS) $<
+
+libudev.so: $(libudev_OBJS)
+	@echo "  CCLD\t$$(basename $@)" 
+	$(CC) -o $@ $(DYN_LDFLAGS) -Wl,-soname=$@ $(libudev_OBJS)
+
+libudev-private.so: $(libudev_private_OBJS)
+	@echo "  CCLD\t$$(basename $@)" 
+	$(CC) -o $@ $(DYN_LDFLAGS) -Wl,-soname=$@ $(libudev_private_OBJS)
+
+libudev.a: $(libudev_OBJS)
+	@echo "  AR\t$$(basename $@)" 
+	$(AR) r $@ $(libudev_OBJS)
+
+libudev-private.a: $(libudev_private_OBJS)
+	@echo "  AR\t$$(basename $@)" 
+	$(AR) r $@ $(libudev_private_OBJS)
+
+udev/udevd: $(udevd_OBJS) libudev-private.so
+	@echo "  CCLD\t$$(basename $@)" 
+	$(CC) -o $@ $(LDFLAGS) $^ $(LIBS) -lcutils
+
+udev/udevadm: $(udevadm_OBJS) libudev-private.so
+	@echo "  CCLD\t$$(basename $@)" 
+	$(CC) -o $@ $(LDFLAGS) $^ $(LIBS)
+
+udev/udevd_init: $(udevd_init_OBJS) libudev-private.so
+	@echo "  CCLD\t$$(basename $@)"
+	$(CC) -o $@ $(LDFLAGS) $^ $(LIBS) -lcutils
+extras/usb_id/usb_id: $(usb_id_OBJS) libudev-private.so
+	@echo "  CCLD\t$$(basename $@)" 
+	$(CC) -o $@ $(LDFLAGS) $^ $(LIBS)
+clean:
+	@echo "   RM\t*.o"
+	$(RM) *.o

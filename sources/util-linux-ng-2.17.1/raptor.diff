@@ -1,0 +1,12 @@
+diff -ur util-linux-ng-2.17.1.orig/misc-utils/blkid.c util-linux-ng-2.17.1/misc-utils/blkid.c
+--- util-linux-ng-2.17.1.orig/misc-utils/blkid.c	2010-02-22 09:41:10.000000000 +0100
++++ util-linux-ng-2.17.1/misc-utils/blkid.c	2010-05-30 21:22:43.000000000 +0200
+@@ -218,7 +218,7 @@
+ 
+ 	/* Get the mount point */
+ 	mtpt[0] = 0;
+-	retval = check_mount_point(devname, &mount_flags, mtpt, sizeof(mtpt));
++	retval=-1;//check_mount_point(devname, &mount_flags, mtpt, sizeof(mtpt));
+ 	if (retval == 0) {
+ 		if (mount_flags & MF_MOUNTED) {
+ 			if (!mtpt[0])

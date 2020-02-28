@@ -1,0 +1,108 @@
+diff -ru udev-164/udev/udevd.c udev-164/udev/udevd.c
+--- udev-164/udev/udevd.c	2012-05-09 18:13:38.000000000 +0200
++++ udev-164/udev/udevd.c	2012-05-09 18:20:53.000000000 +0200
+@@ -296,6 +296,12 @@
+ 
+ 			/* apply rules, create node, symlinks */
+ 			err = udev_event_execute_rules(udev_event, rules);
++			if (udev_event_is_device_removed(udev_event)) {
++				info(udev_event->udev, "device %s removed: skipping event broadcast !", udev_device_get_syspath(dev));
++				failed = 0;
++				alarm(0);
++				goto skip_removed_device;
++			}
+ 
+ 			/* rules may change/disable the timeout */
+ 			if (udev_device_get_event_timeout(dev) >= 0)
+@@ -315,6 +315,7 @@
+ 			/* send processed event back to libudev listeners */
+ 			udev_monitor_send_device(worker_monitor, NULL, dev);
+ 
++skip_removed_device:
+ 			/* send udevd the result of the event execution */
+ 			if (err != 0)
+ 				msg.exitcode = err;
+diff -ru udev-164/udev/udev-event.c udev-164/udev/udev-event.c
+--- udev-164/udev/udev-event.c	2010-10-22 11:53:06.000000000 +0200
++++ udev-164/udev/udev-event.c	2012-05-09 18:24:28.000000000 +0200
+@@ -530,12 +530,36 @@
+ 	return err;
+ }
+ 
++static int device_removed = -1;
++static void udev_event_set_device_removed(struct udev_event *event,
++					  int removed)
++{
++	device_removed = removed;
++}
++
++int udev_event_is_device_removed(struct udev_event *event)
++{
++	struct stat statbuf;
++	const char *syspath;
++
++	if (!event || !event->dev)
++		return 1;
++
++	if (device_removed == -1) {
++		syspath = udev_device_get_syspath(event->dev);
++		device_removed = (stat(syspath, &statbuf) == 0) ? 0 : 1;
++	}
++
++	return device_removed;
++}
++
+ int udev_event_execute_rules(struct udev_event *event, struct udev_rules *rules)
+ {
+ 	struct udev_device *dev = event->dev;
+ 	int err = 0;
+ 
+ 	if (strcmp(udev_device_get_action(dev), "remove") == 0) {
++		udev_event_set_device_removed(event, 0);
+ 		udev_device_read_db(dev);
+ 		udev_device_delete_db(dev);
+ 		udev_device_tag_index(dev, NULL, false);
+@@ -548,6 +572,7 @@
+ 		if (major(udev_device_get_devnum(dev)) != 0)
+ 			err = udev_node_remove(dev);
+ 	} else {
++		udev_event_set_device_removed(event, -1);
+ 		event->dev_db = udev_device_new_from_syspath(event->udev, udev_device_get_syspath(dev));
+ 		if (event->dev_db != NULL) {
+ 			udev_device_read_db(event->dev_db);
+@@ -630,6 +655,15 @@
+ 			udev_device_set_devnode(dev, filename);
+ 		}
+ 
++		/**
++		 * on add/change events, check if device is still present after executing rules
++		 * if not, do not update device database otherwise old properties will be lost !
++		 * a remove event will be triggered close to this one */
++		if (udev_event_is_device_removed(event)) {
++			info(event->udev, "device %s removed: skipping database update !", udev_device_get_syspath(dev));
++			goto skip_update;
++		}
++
+ 		udev_device_update_db(dev);
+ 		udev_device_tag_index(dev, event->dev_db, true);
+ 
+@@ -644,6 +678,7 @@
+ 
+ 			err = udev_node_add(dev, event->mode, event->uid, event->gid);
+ 		}
++skip_update:
+ 
+ 		udev_device_unref(event->dev_db);
+ 		event->dev_db = NULL;
+diff -ru udev-164/udev/udev.h udev-164/udev/udev.h
+--- udev-164/udev/udev.h	2012-05-09 18:13:38.000000000 +0200
++++ udev-164/udev/udev.h	2012-05-09 18:18:02.000000000 +0200
+@@ -75,6 +75,7 @@
+ size_t udev_event_apply_format(struct udev_event *event, const char *src, char *dest, size_t size);
+ int udev_event_apply_subsys_kernel(struct udev_event *event, const char *string,
+ 				   char *result, size_t maxsize, int read_value);
++int udev_event_is_device_removed(struct udev_event *event);
+ 
+ /* udev-watch.c */
+ int udev_watch_init(struct udev *udev);
+

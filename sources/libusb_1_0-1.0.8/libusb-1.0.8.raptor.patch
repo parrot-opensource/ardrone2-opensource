@@ -1,0 +1,24 @@
+--- libusb-1.0.8/configure	2010-05-05 00:02:14.000000000 +0200
++++ libusb-1.0.8/configure.new	2011-06-20 16:56:58.000000000 +0200
+@@ -10706,6 +10706,20 @@
+ 
+ 	AM_LDFLAGS=""
+ 	;;
++
++arm-*-eabi)
++
++    $as_echo "#define OS_LINUX /**/" >>confdefs.h
++
++    cat >>confdefs.h <<\_ACEOF
++#define HAVE_LIBRT 1
++_ACEOF
++
++    LIBS="-lrt $LIBS"
++    ac_cv_lib_rt_clock_gettime=yes
++    AM_LDFLAGS=""
++
++	;;
+ *-darwin*)
+ 
+ $as_echo "#define OS_DARWIN /**/" >>confdefs.h
+
